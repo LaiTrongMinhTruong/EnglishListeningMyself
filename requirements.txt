@@ -1,0 +1,7 @@
+numpy==2.2.4
+pyttsx3==2.99
+deep-translator==1.11.4
+openai==2.6.1
+sounddevice==0.5.2
+SpeechRecognition==3.14.3
+

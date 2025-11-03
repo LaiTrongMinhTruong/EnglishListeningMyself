@@ -28,23 +28,6 @@ def translateText():
         except Exception as e:
             text_area.insert(tk.END, f"\n\nError during translation: {e}")
 
-# def recordAndConvert():
-#     recognizer = sr.Recognizer()
-#     with sr.Microphone() as source:
-#         text_area.insert(tk.END, "\nListening... Speak now!")
-#         try:
-#             audio = recognizer.listen(source, timeout=5)  # Ghi âm trong 5 giây
-#             text_area.insert(tk.END, "\nProcessing your speech...")
-#             recognized_text = recognizer.recognize_google(audio)  # Chuyển giọng nói thành văn bản
-#             text_area.delete(1.0, tk.END)
-#             text_area.insert(tk.END, recognized_text)
-#         except sr.UnknownValueError:
-#             text_area.insert(tk.END, "\nCould not understand the audio.")
-#         except sr.RequestError as e:
-#             text_area.insert(tk.END, f"\nError with the speech recognition service: {e}")
-#         except Exception as e:
-#             text_area.insert(tk.END, f"\nAn error occurred: {e}")
-
 recording = False
 recorded_frames = []
 stream = None
@@ -118,9 +101,6 @@ read_btn.pack(side=tk.LEFT, padx=5)
 
 translate_btn = tk.Button(button_frame, text="🌐 Translate to Vietnamese", command=translateText, font=livvic_font)
 translate_btn.pack(side=tk.LEFT, padx=5)
-
-# record_btn = tk.Button(button_frame, text="🎙️ Record and Convert", command=recordAndConvert, font=livvic_font)
-# record_btn.pack(side=tk.LEFT, padx=5)
 
 record_btn = tk.Button(button_frame, text="🎙️ Start Recording", command=toggleRecording, font=livvic_font)
 record_btn.pack(side=tk.LEFT, padx=5)
