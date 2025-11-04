@@ -287,7 +287,7 @@ def refresh_vocab_table():
 
 def add_word_popup():
     d = simpledialog.Dialog(root, title="Add new word")
-    # We'll implement custom simple dialog using Toplevel for better control
+
     win = tk.Toplevel(root)
     win.title("Add new word")
     win.grab_set()
@@ -349,13 +349,13 @@ def practice_vocab_with_ai():
         return
 
     prompt = (
-        "Bạn là giáo viên tiếng Anh B2. Dựa trên danh sách từ vựng sau, hãy tạo một bài kiểm tra ngắn gồm 5 câu.\n"
-        "Mỗi câu là một câu hỏi trắc nghiệm có 4 lựa chọn, chỉ 1 đáp án đúng. "
-        "Đánh số câu, và ở cuối đưa ra đáp án đúng với lời giải ngắn.\n\n"
+        "You are a B2 English teacher. Based on the following vocabulary list, create a short test of 5 sentences.\n"
+        "Each question is a multiple choice question with 4 options, only 1 correct answer. "
+        "Number the questions, and at the end give the correct answer with short explanation.\n\n"
         f"{json.dumps(data, ensure_ascii=False, indent=2)}"
     )
 
-    append_ai_message_to_chat("Đang tạo bài tập từ vựng...")
+    append_ai_message_to_chat("Creating vocabulary exercises...")
 
     def worker(p):
         try:
@@ -391,9 +391,7 @@ if not os.path.exists(VOCAB_FILE):
     save_vocab(sample)
 refresh_vocab_table()
 
-# -------------------------
-# Right column: Chat with AI
-# -------------------------
+
 right_frame = tk.Frame(root, bg=TITLE_BG)
 right_frame.grid(row=0, column=1, sticky="nsew", padx=(10,20), pady=20)
 right_frame.grid_rowconfigure(0, weight=1)
@@ -510,7 +508,7 @@ def record_ai_and_save_audio_and_send_for_eval(btn_widget):
         ai_input_textarea.insert(tk.END, f"\n💾 Saved: {filename}\n")
         btn_widget.config(text="🎙️ Record Answer")
         # If want to send audio to AI (audio model), implement here (requires quota & audio model)
-        # For now we just save and show path.
+        # For now I just save and show path.
 
 # UI buttons on right
 ai_btn_input_frame = tk.Frame(right_frame, bg=CARD_BG)
@@ -527,6 +525,6 @@ send_btn = tk.Button(ai_btn_input_frame, text="💬 Send to AI", font=livvic_fon
                      width=12, command=send_to_ai_from_input)
 send_btn.grid(row=0, column=1, padx=6, pady=12, sticky="ew")
 
-append_ai_message_to_chat("Xin chào! Tôi là trợ lý học tiếng Anh. Hãy hỏi tôi bất cứ điều gì.")
+append_ai_message_to_chat("Hi! I'm an English tutor. Ask me anything.")
 
 root.mainloop()

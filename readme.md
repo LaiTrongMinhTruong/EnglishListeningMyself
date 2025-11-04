@@ -58,17 +58,16 @@ Dự án kết hợp sức mạnh của **AI (OpenAI GPT)**, **Speech Recognitio
 ## ⚙️ Cài đặt & Sử dụng
 
 - Các bạn muốn dùng dự án vui lòng truy cập https://platform.openai.com/settings/organization/api-keys để tạo api key 
-- Sau đó tạo biến môi trường để lưu key:
-    Có thể lưu thủ công bằng mở window -> search "enviroment variable" -> click "new" -> nhập "OPENAI_API_KEY" -> click "add" -> nhập key -> click "ok"
-    Cách khác là mở terminal, nhập "setx OPENAI_API_KEY '[key]'". Sau đó kiểm tra bằng lệnh "echo %OPENAI_API_KEY%" để xem key vừa nhập đúng chưa
-
+- Sau đó mở terminal, nhập `setx OPENAI_API_KEY '[key]'`. Sau đó kiểm tra bằng lệnh `echo %OPENAI_API_KEY%` để xem key vừa nhập đúng chưa
+- Nếu tài khoản của bạn có thể sử dụng model AI trả phí, bạn hoàn toàn có thể sử dụng chức năng AI nghe và sửa lỗi phát âm bằng cách thay hàm `record_ai_and_send_text` bằng hàm `record_ai_and_save_audio_and_send_for_eval` ở dòng 523 trong file `main.py`
+- Tự do cấu hình promt để gửi lên AI thực hiện truy vấn ở các hàm liên quan đến gọi API (dòng 344, 435 trong file `main.py`)
 
 ### 1️⃣ Cài đặt thư viện
 Chạy lệnh trong Terminal:
 ```bash
-    pip install -r requirements.txt to install dependencies for main.py
+    pip install -r requirements.txt
 
-    python main.py to run main.py
+    python main.py
 ```
 
 ---
