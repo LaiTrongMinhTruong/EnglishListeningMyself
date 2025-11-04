@@ -1,33 +1,42 @@
 import tkinter as tk
-from tkinter import scrolledtext, font
+from tkinter import ttk, simpledialog, messagebox, scrolledtext, font
 import threading
+import json, os, wave, base64
+from datetime import datetime
 import numpy as np
 import pyttsx3
 from deep_translator import GoogleTranslator
 from openai import OpenAI
-import os
 import sounddevice as sd
 import speech_recognition as sr
-import wave
-from datetime import datetime
-import base64
+
+
+VOCAB_FILE = "vocab.json"
+RECORDINGS_DIR = "recordings"
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+
 
 recording = False
 recorded_frames = []
 stream = None
 
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    print("WARNING: OPENAI_API_KEY not set in environment. AI functions will fail until set.")
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+
 root = tk.Tk()
 root.title("🎓 English Study Box")
 root.config(bg="#f8f9fa")
-
-# Fullscreen & exit with Esc
+# root.geometry('1000x1000')
 root.attributes("-fullscreen", True)
 root.bind("<Escape>", lambda e: root.attributes("-fullscreen", False))
 
-# Fonts & basic styling
 try:
     livvic_font = font.Font(family="Livvic", size=13)
-except:
+except Exception:
     livvic_font = font.Font(family="Arial", size=13)
 
 TITLE_BG = "#f8f9fa"
@@ -36,151 +45,102 @@ ACCENT = "#3498db"
 BTN_GREEN = "#2ecc71"
 TEXT_BG = "#fafafa"
 
-# Use grid: 2 columns (left/right) each 50%
 root.grid_rowconfigure(0, weight=1)
-root.grid_columnconfigure(0, weight=1)
-root.grid_columnconfigure(1, weight=1)
+root.grid_columnconfigure(0, weight=1, uniform="group_root")
+root.grid_columnconfigure(1, weight=1, uniform="group_root")
 
 
-# --------------------------
-# LEFT COLUMN (3 stacked blocks)
-# --------------------------
+def read_text(text):
+    if not text:
+        return
+    try:
+        engine = pyttsx3.init()
+        engine.setProperty("rate", 150)
+        voices = engine.getProperty("voices")
+        engine.setProperty("voice", voices[1].id if len(voices) > 1 else voices[0].id)
+        engine.say(text)
+        engine.runAndWait()
+        engine.stop()
+    except Exception as e:
+        print("TTS error:", e)
+
+def translate_text(from_lang, to_lang, text):
+    if not text.strip():
+        return ""
+    src_code = "vi" if from_lang in ("vn","vi") else "en"
+    tgt_code = "vi" if to_lang in ("vn","vi") else "en"
+    try:
+        return GoogleTranslator(source=src_code, target=tgt_code).translate(text)
+    except Exception as e:
+        return f"[Translate error: {e}]"
+
+
+def load_vocab():
+    if not os.path.exists(VOCAB_FILE):
+        return []
+    try:
+        with open(VOCAB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_vocab(data_list):
+    try:
+        with open(VOCAB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data_list, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print("Save vocab error:", e)
+        return False
+
+
+# Left frame (translation top, vocab bottom)
 left_frame = tk.Frame(root, bg=TITLE_BG)
 left_frame.grid(row=0, column=0, sticky="nsew", padx=(20,10), pady=20)
-left_frame.grid_rowconfigure(0, weight=1)
-left_frame.grid_rowconfigure(1, weight=1)
-left_frame.grid_rowconfigure(2, weight=1)
-left_frame.grid_columnconfigure(0, weight=1)
+left_frame.grid_rowconfigure(0, weight=2, uniform="group_top_left")
+left_frame.grid_rowconfigure(1, weight=3, uniform="group_top_left")
+left_frame.grid_columnconfigure(0, weight=1, uniform="group_top_left")
 
-# header = tk.Label(left_frame, text="ENGLISH STUDY BOX — INPUTS", font=("Livvic", 18, "bold"), bg=TITLE_BG, fg="#2c3e50")
-# header.grid(row= 0, column=0, sticky="w", padx=5, pady=(0,10))  # decorative header
-
-def make_io_block(parent, title, lang_code_label, record_lang, translate_from, translate_to, read_source_area_target):
-    """
-    Create a block with left button column and right text area.
-    - record_lang: "vn" or "en" (for toggleRecording)
-    - translate_from/translate_to: codes for translate()
-    - read_source_area_target: which text area to read for 'Read' button (Text widget)
-    """
-    block = tk.Frame(parent, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
-    block.grid_columnconfigure(0, weight=0)
-    block.grid_columnconfigure(1, weight=1)
-    block.grid_rowconfigure(0, weight=1)
-
-    header = tk.Label(block, text=title, font=("Livvic", 14, "bold"), bg=CARD_BG, fg="#2c3e50")
-    header.grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(10,0))
-
-    btn_col = tk.Frame(block, bg=CARD_BG)
-    btn_col.grid(row=1, column=0, sticky="ns", padx=10, pady=10)
-
-    text_area = scrolledtext.ScrolledText(
-        block,
-        wrap=tk.WORD,
-        font=livvic_font,
-        bg=TEXT_BG,
-        relief="flat",
-        highlightbackground="#dcdde1",
-        highlightthickness=1,
-        padx=10, pady=10
-    )
-    text_area.grid(row=1, column=1, sticky="nsew", padx=(0,12), pady=10)
-
-    # Buttons
-    record_btn = tk.Button(btn_col, text="🎙️ Record", font=livvic_font, bg=BTN_GREEN, fg="white", width=18, relief="flat")
-    record_btn.pack(pady=6)
-
-    translate_btn = tk.Button(btn_col, text="🌐 Translate", font=livvic_font, bg=ACCENT, fg="white", width=18, relief="flat")
-    translate_btn.pack(pady=6)
-
-    read_btn = tk.Button(btn_col, text="🔊 Read", font=livvic_font, bg=ACCENT, fg="white", width=18, relief="flat")
-    read_btn.pack(pady=6)
-
-    # map commands (use closures)
-    record_btn.config(command=lambda: toggleRecording(record_lang, text_area, record_btn))
-    # translate: translate text from this text_area and put into the other side (for VN block -> EN block, etc.)
-    # We'll accept translate_from/translate_to strings like "vn" / "en" mapped to "vi"/"en" for translator
-    def translate_cmd():
-        src = text_area.get(1.0, tk.END).strip()
-        if not src:
-            text_area.insert(tk.END, "\n⚠️ Nothing to translate.")
-            return
-        # map simple codes
-        translate_from
-        translate_to
-        try:
-            translated = translate(translate_from, translate_to, src)
-            # place result into the paired target area depending on arguments
-            # read_source_area_target param will be a callable that returns the target area
-            target_area = read_source_area_target()
-            target_area.delete(1.0, tk.END)
-            target_area.insert(tk.END, translated)
-        except Exception as e:
-            text_area.insert(tk.END, f"\n❌ Translate error: {e}")
-
-    translate_btn.config(command=translate_cmd)
-    read_btn.config(command=lambda: readInput(read_source_area_target()))
-
-    return block, text_area, record_btn, translate_btn, read_btn
-
-# We'll create placeholders for blocks and then we can reference sibling areas for translations
-vn_block_frame, vn_text_area, vn_rec_btn, vn_trans_btn, vn_read_btn = make_io_block(left_frame, "🗣️ Vietnamese Input", "VN", "vi", "vi", "en", lambda: None)
-en_block_frame, en_text_area, en_rec_btn, en_trans_btn, en_read_btn = make_io_block(left_frame, "🗣️ English Input", "EN", "en", "en", "vi", lambda: None)
+# Translation Box (top)
 trans_block = tk.Frame(left_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
-
-# place them
-vn_block_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0,8))
-en_block_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=8)
-trans_block.grid(row=2, column=0, sticky="nsew", padx=5, pady=(8,0))
-
-# Now fix the translate/read callbacks to point to the correct sibling areas
-# For VN block: translate -> put into en_text_area; read button should read en_text_area
-vn_trans_btn.config(command=lambda: getAndSetTranslatedText(vn_text_area, en_text_area, "vi", "en"))
-vn_read_btn.config(command=lambda: readInput(en_text_area))
-
-# For EN block: translate -> put into vn_text_area; read button read en_text_area
-en_trans_btn.config(command=lambda: getAndSetTranslatedText(en_text_area, vn_text_area, "en", "vi"))
-en_read_btn.config(command=lambda: readInput(en_text_area))
-
-# --------------------------
-# Translation Box (third block)
-# --------------------------
+trans_block.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0,8))
 trans_block.grid_columnconfigure(0, weight=1)
 trans_block.grid_columnconfigure(1, weight=0)
 trans_block.grid_columnconfigure(2, weight=1)
 trans_block.grid_rowconfigure(0, weight=1)
 
-left_trans_area = scrolledtext.ScrolledText(
-    trans_block,
-    wrap=tk.WORD,
-    font=livvic_font,
-    bg=TEXT_BG,
-    relief="flat",
-    padx=10, pady=10
-)
+left_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10)
 left_trans_area.grid(row=0, column=0, sticky="nsew", padx=(12,6), pady=12)
 
 mid_btns = tk.Frame(trans_block, bg=CARD_BG)
-mid_btns.grid(row=0, column=1, sticky="nsew", padx=6, pady=12)
+mid_btns.grid(row=0, column=1, sticky="ns", padx=6, pady=12)
 
-right_trans_area = scrolledtext.ScrolledText(
-    trans_block,
-    wrap=tk.WORD,
-    font=livvic_font,
-    bg=TEXT_BG,
-    relief="flat",
-    padx=10, pady=10
-)
+right_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10)
 right_trans_area.grid(row=0, column=2, sticky="nsew", padx=(6,12), pady=12)
-def translate(from_lang, to_lang, input_text):
-    translated = GoogleTranslator(source=from_lang, target=to_lang).translate(input_text)
-    return translated
 
-def getAndSetTranslatedText(get_area, set_area, from_lang, to_lang):
-    user_input = get_area.get(1.0, tk.END).strip()
-    trans_text = translate(from_lang, to_lang, user_input)
-    set_area.insert(tk.END, "\n\n" + trans_text)
+def do_translate_left_to_right():
+    src = left_trans_area.get(1.0, tk.END).strip()
+    if not src:
+        left_trans_area.insert(tk.END, "\n⚠️ Nothing to translate.")
+        return
+    tgt = translate_text("vn","en", src)
+    right_trans_area.delete(1.0, tk.END)
+    right_trans_area.insert(tk.END, tgt)
 
-def toggleRecording(language, text_area, btn_widget=None):
+def do_translate_right_to_left():
+    src = right_trans_area.get(1.0, tk.END).strip()
+    if not src:
+        right_trans_area.insert(tk.END, "\n⚠️ Nothing to translate.")
+        return
+    tgt = translate_text("en","vn", src)
+    left_trans_area.delete(1.0, tk.END)
+    left_trans_area.insert(tk.END, tgt)
+
+def do_read_right():
+    read_text(right_trans_area.get(1.0, tk.END).strip())
+
+
+def toggle_record_for_area(language, target_text_widget, btn_widget=None):
     global recording, recorded_frames, stream
     lang_code = "vi-VN" if language == "vi" else "en-US"
     if not recording:
@@ -194,11 +154,14 @@ def toggleRecording(language, text_area, btn_widget=None):
             stream.start()
             if btn_widget:
                 btn_widget.config(text="⏹ Stop Recording")
+            target_text_widget.insert(tk.END, "\n🎙️ Recording... Speak now.")
         except Exception as e:
             recording = False
             if btn_widget:
-                btn_widget.config(text="🎙️ Start Recording")
+                btn_widget.config(text="Record")
+            target_text_widget.insert(tk.END, f"\n❌ Failed to start recording: {e}")
     else:
+        # stop
         recording = False
         if stream:
             try:
@@ -209,86 +172,233 @@ def toggleRecording(language, text_area, btn_widget=None):
             stream = None
 
         if not recorded_frames:
-            text_area.insert(tk.END, "\n⚠️ No audio recorded.")
+            target_text_widget.insert(tk.END, "\n⚠️ No audio recorded.")
             if btn_widget:
-                btn_widget.config(text="🎙️ Start Recording")
+                btn_widget.config(text="Record")
             return
 
+        audio_data = np.concatenate(recorded_frames, axis=0)
+        audio_bytes = audio_data.tobytes()
+        sample_width = audio_data.dtype.itemsize
+        audio = sr.AudioData(audio_bytes, 16000, sample_width)
+        r = sr.Recognizer()
         try:
-            audio_data = np.concatenate(recorded_frames, axis=0)
-            audio_bytes = audio_data.tobytes()
-            sample_width = audio_data.dtype.itemsize  # thường 2 cho int16
-            audio = sr.AudioData(audio_bytes, 16000, sample_width)
-
-            recognizer = sr.Recognizer()
-            recognized_text = recognizer.recognize_google(audio, language=lang_code)
-
-            text_area.delete(1.0, tk.END)
-            text_area.insert(tk.END, recognized_text)
-
+            text = r.recognize_google(audio, language=lang_code)
+            target_text_widget.delete(1.0, tk.END)
+            target_text_widget.insert(tk.END, text)
         except sr.UnknownValueError:
-            text_area.insert(tk.END, "\n⚠️ Could not understand the audio.")
-        except sr.RequestError as e:
-            text_area.insert(tk.END, f"\n❌ Speech recognition error: {e}")
+            target_text_widget.insert(tk.END, "\n⚠️ Could not understand the audio.")
         except Exception as e:
-            text_area.insert(tk.END, f"\n⚠️ Error: {e}")
+            target_text_widget.insert(tk.END, f"\n❌ Speech recognition error: {e}")
 
         if btn_widget:
-            btn_widget.config(text="🎙️ Start Recording")
+            btn_widget.config(text="🎙️ Record")
 
-def readInput(text_area):
-    engine = pyttsx3.init()
-    engine.setProperty("rate", 150)
-    voices = engine.getProperty("voices")
-    engine.setProperty("voice", voices[1].id if len(voices) > 1 else voices[0].id)
-    user_input = text_area.get(1.0, tk.END).strip()
-    if user_input:
-        engine.say(user_input)
-        engine.runAndWait()
-    engine.stop()
-
-def readText(text):
-    mouth = pyttsx3.init()
-    mouth.say(text)
-    mouth.runAndWait()
-    mouth.stop()
-    
-def ai_thinking(request):
-    print("request:", request)
-    try:
-        client = OpenAI(api_key = os.environ["OPENAI_API_KEY"])
-        response = client.responses.create(
-            model="gpt-4.1-nano",
-            input=[
-                {"role": "system", "content": "Cô giáo Tiếng Anh, trả lời súc tích."},
-                {"role": "user", "content": request},
-            ],
-            max_output_tokens=100,
-            temperature=0.7, # độ sáng tạo 0: nghiêm ngặt, 1: sáng tạo
-        )
-        print("response: " + response.output[0].content[0].text)
-        return response.output[0].content[0].text
-    except:
-        return "Hiện tại tôi đang gặp lỗi, vui lòng thử lại sau."
-    
-def do_translate_left_to_right():
-    getAndSetTranslatedText(left_trans_area, right_trans_area, "vi", "en")
-def do_translate_right_to_left():
-    getAndSetTranslatedText(right_trans_area, left_trans_area, "en", "vi")
-def do_read_right():
-    readInput(right_trans_area)
-
-tk.Button(mid_btns, text="VN ⮕ EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right).pack(pady=6)
-tk.Button(mid_btns, text="VN ⭠ EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_right_to_left).pack(pady=6)
+# translation middle buttons
+tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right).pack(pady=6)
+tk.Button(mid_btns, text="VN ← EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_right_to_left).pack(pady=6)
 tk.Button(mid_btns, text="Read EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_read_right).pack(pady=6)
+# record buttons for VN / EN
+rec_vn_btn = tk.Button(mid_btns, text="Record VN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat",
+                       command=lambda: toggle_record_for_area("vi", left_trans_area, rec_vn_btn))
+rec_vn_btn.pack(pady=6)
+rec_en_btn = tk.Button(mid_btns, text="Record EN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat",
+                       command=lambda: toggle_record_for_area("en", right_trans_area, rec_en_btn))
+rec_en_btn.pack(pady=6)
 
-# --------------------------
-# RIGHT COLUMN (AI chat)
-# --------------------------
+
+vocab_card = tk.Frame(left_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
+vocab_card.grid(row=1, column=0, sticky="nsew", padx=5, pady=(8,0))
+vocab_card.grid_rowconfigure(0, weight=1)
+vocab_card.grid_rowconfigure(1, weight=0)
+vocab_card.grid_columnconfigure(0, weight=1)
+
+# Treeview (show data)
+cols = ("word", "meaning", "example")
+tree_frame = tk.Frame(vocab_card, bg=CARD_BG)
+tree_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=8)
+tree_frame.grid_rowconfigure(0, weight=1)
+tree_frame.grid_columnconfigure(0, weight=1)
+
+tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
+for c in cols:
+    tree.heading(c, text=c.capitalize())
+    tree.column(c, width=200, anchor="w")
+tree.grid(row=0, column=0, sticky="nsew")
+
+scroll_y = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+tree.configure(yscrollcommand=scroll_y.set)
+scroll_y.grid(row=0, column=1, sticky="ns")
+
+# inline edit: on double click open Entry overlay
+editing_entry = None
+editing_info = None  # (item_id, col)
+
+def on_tree_double_click(event):
+    global editing_entry, editing_info
+    region = tree.identify("region", event.x, event.y)
+    if region != "cell":
+        return
+    rowid = tree.identify_row(event.y)
+    col = tree.identify_column(event.x)  # like '#1'
+    col_index = int(col.replace("#","")) - 1
+    if not rowid:
+        return
+    x,y,width,height = tree.bbox(rowid, column=col)
+    value = tree.item(rowid, "values")[col_index]
+    editing_info = (rowid, col_index)
+    editing_entry = tk.Entry(tree_frame, font=livvic_font)
+    editing_entry.insert(0, value)
+    editing_entry.place(x=x, y=y, width=width, height=height)
+    editing_entry.focus_set()
+    def finish_edit(event=None):
+        global editing_entry, editing_info
+        newval = editing_entry.get()
+        item, idx = editing_info
+        vals = list(tree.item(item, "values"))
+        vals[idx] = newval
+        tree.item(item, values=vals)
+        editing_entry.destroy()
+        editing_entry = None
+        editing_info = None
+    editing_entry.bind("<Return>", finish_edit)
+    editing_entry.bind("<FocusOut>", finish_edit)
+
+tree.bind("<Double-1>", on_tree_double_click)
+
+# buttons under the table
+btns_frame = tk.Frame(vocab_card, bg=CARD_BG)
+btns_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(6,12))
+btns_frame.grid_columnconfigure(0, weight=1)
+btns_frame.grid_columnconfigure(1, weight=1)
+btns_frame.grid_columnconfigure(2, weight=1)
+btns_frame.grid_columnconfigure(3, weight=1)
+btns_frame.grid_columnconfigure(4, weight=1)
+btns_frame.grid_rowconfigure(0, weight=1)
+
+def refresh_vocab_table():
+    tree.delete(*tree.get_children())
+    data = load_vocab()
+    for entry in data:
+        tree.insert("", "end", values=(entry.get("word",""), entry.get("meaning",""), entry.get("example","")))
+    # autosize columns a bit
+    for c in cols:
+        tree.column(c, width=200)
+
+def add_word_popup():
+    d = simpledialog.Dialog(root, title="Add new word")
+    # We'll implement custom simple dialog using Toplevel for better control
+    win = tk.Toplevel(root)
+    win.title("Add new word")
+    win.grab_set()
+    tk.Label(win, text="Word").grid(row=0, column=0, padx=8, pady=6)
+    e_word = tk.Entry(win, width=40)
+    e_word.grid(row=0, column=1, padx=8, pady=6)
+    tk.Label(win, text="Meaning").grid(row=1, column=0, padx=8, pady=6)
+    e_mean = tk.Entry(win, width=40)
+    e_mean.grid(row=1, column=1, padx=8, pady=6)
+    tk.Label(win, text="Example").grid(row=2, column=0, padx=8, pady=6)
+    e_ex = tk.Entry(win, width=40)
+    e_ex.grid(row=2, column=1, padx=8, pady=6)
+
+    def on_ok():
+        w = e_word.get().strip()
+        m = e_mean.get().strip()
+        ex = e_ex.get().strip()
+        if not w:
+            messagebox.showwarning("Validation", "Word cannot be empty.")
+            return
+        tree.insert("", "end", values=(w, m, ex))
+        win.destroy()
+
+    tk.Button(win, text="Add", command=on_ok, bg=ACCENT, fg="white").grid(row=3, column=0, columnspan=2, pady=8)
+    win.wait_window()
+
+def delete_selected_word():
+    sel = tree.selection()
+    if not sel:
+        messagebox.showinfo("Select", "Please select a row to delete.")
+        return
+    tree.delete(sel[0])
+
+def save_table_to_file():
+    all_vals = []
+    for item in tree.get_children():
+        w, m, ex = tree.item(item, "values")
+        all_vals.append({"word": w, "meaning": m, "example": ex})
+    ok = save_vocab(all_vals)
+    if ok:
+        messagebox.showinfo("Saved", f"Saved {len(all_vals)} words to {VOCAB_FILE}")
+    else:
+        messagebox.showerror("Error", "Failed to save vocab file.")
+
+def load_table_from_file():
+    refresh_vocab_table()
+    messagebox.showinfo("Loaded", f"Loaded from {VOCAB_FILE}")
+
+tk.Button(btns_frame, text="➕ Add", command=add_word_popup, bg=BTN_GREEN, fg="white").grid(row=0, column=0, sticky="ew", padx=6)
+tk.Button(btns_frame, text="🗑 Delete", command=delete_selected_word, bg="#e74c3c", fg="white").grid(row=0, column=1, sticky="ew", padx=6)
+tk.Button(btns_frame, text="💾 Save", command=save_table_to_file, bg=ACCENT, fg="white").grid(row=0, column=2, sticky="ew", padx=6)
+tk.Button(btns_frame, text="🔁 Refresh", command=refresh_vocab_table, bg="#95a5a6", fg="white").grid(row=0, column=3, sticky="ew", padx=6)
+
+def practice_vocab_with_ai():
+    # Read vocab.json and call AI to generate practice quiz, show in chat
+    data = load_vocab()
+    if not data:
+        messagebox.showinfo("No vocab", "Vocabulary list is empty. Add words first.")
+        return
+
+    prompt = (
+        "Bạn là giáo viên tiếng Anh B2. Dựa trên danh sách từ vựng sau, hãy tạo một bài kiểm tra ngắn gồm 5 câu.\n"
+        "Mỗi câu là một câu hỏi trắc nghiệm có 4 lựa chọn, chỉ 1 đáp án đúng. "
+        "Đánh số câu, và ở cuối đưa ra đáp án đúng với lời giải ngắn.\n\n"
+        f"{json.dumps(data, ensure_ascii=False, indent=2)}"
+    )
+
+    append_ai_message_to_chat("Đang tạo bài tập từ vựng...")
+
+    def worker(p):
+        try:
+            if client is None:
+                raise RuntimeError("OpenAI client not configured (OPENAI_API_KEY missing).")
+            resp = client.responses.create(
+                model="gpt-4.1-mini",
+                input=[{"role":"user","content": p}],
+                max_output_tokens=500
+            )
+            out = resp.output_text if hasattr(resp, "output_text") else None
+            if not out:
+                # try fallback to older shape
+                try:
+                    out = resp.output[0].content[0].text
+                except Exception:
+                    out = str(resp)
+        except Exception as e:
+            out = f"Error generating practice: {e}"
+        root.after(0, append_ai_message_to_chat, out)
+
+    threading.Thread(target=worker, args=(prompt,), daemon=True).start()
+
+tk.Button(btns_frame, text="🧠 Practice", command=practice_vocab_with_ai, bg="#8e44ad", fg="white").grid(row=0, column=4, sticky="ew", padx=6)
+
+# initial load
+if not os.path.exists(VOCAB_FILE):
+    # create a sample
+    sample = [
+        {"word":"apple","meaning":"quả táo","example":"I eat an apple every day."},
+        {"word":"run","meaning":"chạy","example":"He runs fast."}
+    ]
+    save_vocab(sample)
+refresh_vocab_table()
+
+# -------------------------
+# Right column: Chat with AI
+# -------------------------
 right_frame = tk.Frame(root, bg=TITLE_BG)
 right_frame.grid(row=0, column=1, sticky="nsew", padx=(10,20), pady=20)
 right_frame.grid_rowconfigure(0, weight=1)
 right_frame.grid_rowconfigure(1, weight=0)
+right_frame.grid_rowconfigure(2, weight=0)
 right_frame.grid_columnconfigure(0, weight=1)
 
 chat_card = tk.Frame(right_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
@@ -296,36 +406,13 @@ chat_card.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0,8))
 chat_card.grid_rowconfigure(0, weight=1)
 chat_card.grid_columnconfigure(0, weight=1)
 
-# chat_label = tk.Label(chat_card, text="💬 Chat with AI", font=("Livvic", 14, "bold"), bg=CARD_BG, fg="#2c3e50")
-# chat_label.grid(row=0, column=0, sticky="w", padx=12, pady=(10,0))
-
-chat_area = scrolledtext.ScrolledText(
-    chat_card,
-    wrap=tk.WORD,
-    font=livvic_font,
-    bg=TEXT_BG,
-    relief="flat",
-    padx=10, pady=10,
-    state=tk.NORMAL
-)
+chat_area = scrolledtext.ScrolledText(chat_card, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10, state=tk.NORMAL)
 chat_area.grid(row=0, column=0, sticky="nsew", padx=12, pady=10)
 
-# tags for styling bubbles
 chat_area.tag_configure("user", foreground="#ffffff", background="#2c3e50", lmargin1=40, lmargin2=40, rmargin=10, spacing3=8, justify="right")
 chat_area.tag_configure("ai", foreground="#2c3e50", background="#e9f6ff", lmargin1=10, lmargin2=10, rmargin=40, spacing3=8, justify="left")
 chat_area.tag_configure("meta", foreground="#7f8c8d", font=("Arial", 9), justify="center")
 
-# input area (for user to review or type before sending)
-ai_input_frame = tk.Frame(right_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
-ai_input_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(8,0))
-ai_input_frame.grid_columnconfigure(0, weight=1)
-ai_input_frame.grid_columnconfigure(1, weight=0)
-# ai_input_frame.grid_columnconfigure(2, weight=0)
-
-ai_input_textarea = scrolledtext.ScrolledText(ai_input_frame, wrap=tk.WORD, height=5, font=livvic_font, bg=TEXT_BG, relief="flat", padx=10, pady=10)
-ai_input_textarea.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
-
-# Send and Record buttons for AI
 def append_user_message_to_chat(msg):
     if not msg.strip():
         return
@@ -336,6 +423,17 @@ def append_ai_message_to_chat(msg):
     chat_area.insert(tk.END, "" + msg + "\n", "ai")
     chat_area.see(tk.END)
 
+# input area
+ai_input_frame = tk.Frame(right_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
+ai_input_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(8,0))
+ai_input_frame.grid_columnconfigure(0, weight=1)
+# ai_input_frame.grid_columnconfigure(1, weight=0)
+ai_input_frame.grid_rowconfigure(0, weight=1)
+
+ai_input_textarea = scrolledtext.ScrolledText(ai_input_frame, wrap=tk.WORD, height=5, font=livvic_font, bg=TEXT_BG, relief="flat", padx=10, pady=10)
+ai_input_textarea.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+
+# send to AI
 def send_to_ai_from_input():
     user_msg = ai_input_textarea.get(1.0, tk.END).strip()
     if not user_msg:
@@ -343,49 +441,43 @@ def send_to_ai_from_input():
     ai_input_textarea.delete(1.0, tk.END)
     append_user_message_to_chat(user_msg)
 
-    # run AI call in background
     def worker(text):
         try:
-            reply = ai_thinking(text)
+            if client is None:
+                raise RuntimeError("OpenAI client not configured (OPENAI_API_KEY missing).")
+            resp = client.responses.create(
+                model="gpt-4.1-mini",
+                input=[{"role":"user","content": text}],
+                max_output_tokens=300
+            )
+            out = getattr(resp, "output_text", None)
+            if not out:
+                try:
+                    out = resp.output[0].content[0].text
+                except Exception:
+                    out = str(resp)
         except Exception as e:
-            reply = f"Error: {e}"
-        # show AI reply in main thread
-        # readText(reply)
-        root.after(0, append_ai_message_to_chat, reply)
-        # read AI reply
+            out = f"Error: {e}"
+        root.after(0, append_ai_message_to_chat, out)
         try:
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 150)
-            voices = engine.getProperty("voices")
-            engine.setProperty("voice", voices[1].id if len(voices) > 1 else voices[0].id)
-            engine.say(reply)
-            engine.runAndWait()
-            engine.stop()
+            read_text(out)
         except Exception:
             pass
 
     threading.Thread(target=worker, args=(user_msg,), daemon=True).start()
 
+# Record answer (text flow): record and convert to text then send
 def record_ai_and_send_text(btn_widget):
-    # Gọi hàm toggleRecording đã có; nhấn nút sẽ chuyển đổi trạng thái bắt đầu/dừng (ghi âm).
-    # Sau khi hàm toggleRecording trả về, nếu trạng thái ghi âm là False (Đã dừng) thì âm thanh đã được xử lý xong.
-    # Và văn bản đã được chèn vào ô nhập liệu. Vì thế, chúng ta sẽ tự động gửi nó đi.
-    toggleRecording("en", ai_input_textarea, btn_widget)
-    # nếu chúng ta vừa dừng lại (ghi False) và có văn bản -> gửi
+    toggle_record_for_area("en", ai_input_textarea, btn_widget)
     if not globals().get("recording", False):
         user_msg = ai_input_textarea.get(1.0, tk.END).strip()
         if user_msg:
-            # delay nhỏ để cập nhật ui
-            root.after(100, send_to_ai_from_input)
+            root.after(150, send_to_ai_from_input)
 
-def record_ai_and_send_audio(btn_widget):
-    """Hàm ghi âm giọng nói để AI chấm phát âm"""
+# Record answer (audio file) and optionally send to audio-model (not used for practice)
+def record_ai_and_save_audio_and_send_for_eval(btn_widget):
     global recording, recorded_frames, stream
-
-    recordings_dir = "recordings"
-    os.makedirs(recordings_dir, exist_ok=True)
-    filename = os.path.join(recordings_dir, f"user_audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav")
-
+    filename = os.path.join(RECORDINGS_DIR, f"user_audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav")
     if not recording:
         recorded_frames = []
         def callback(indata, frames, time, status):
@@ -394,8 +486,8 @@ def record_ai_and_send_audio(btn_widget):
         stream = sd.InputStream(samplerate=16000, channels=1, dtype='int16', callback=callback)
         stream.start()
         recording = True
-        btn_widget.config(text="Stop Recording")
-        ai_input_textarea.insert(tk.END, "\nRecording... Speak now.\n")
+        btn_widget.config(text="⏹ Stop Recording")
+        ai_input_textarea.insert(tk.END, "\n🎙️ Recording... Speak now.\n")
     else:
         recording = False
         if stream:
@@ -405,92 +497,35 @@ def record_ai_and_send_audio(btn_widget):
             except Exception:
                 pass
             stream = None
-
         if not recorded_frames:
             ai_input_textarea.insert(tk.END, "\n⚠️ No audio recorded.\n")
-            btn_widget.config(text="Record Answer")
+            btn_widget.config(text="🎙️ Record Answer")
             return
-
         audio_data = np.concatenate(recorded_frames, axis=0)
-
-        # Lưu file .wav
-        with wave.open(filename, 'wb') as wf:
+        with wave.open(filename, "wb") as wf:
             wf.setnchannels(1)
-            wf.setsampwidth(2)  # 16-bit
+            wf.setsampwidth(2)
             wf.setframerate(16000)
             wf.writeframes(audio_data.tobytes())
+        ai_input_textarea.insert(tk.END, f"\n💾 Saved: {filename}\n")
+        btn_widget.config(text="🎙️ Record Answer")
+        # If want to send audio to AI (audio model), implement here (requires quota & audio model)
+        # For now we just save and show path.
 
-        ai_input_textarea.insert(tk.END, f"\nSaved: {filename}\n")
-        btn_widget.config(text="Record Answer")
-
-        # Gửi cho AI để đánh giá phát âm
-        root.after(200, lambda: evaluate_pronunciation(filename))
-
-def evaluate_pronunciation(audio_path):
-    """Gửi file âm thanh tới AI để chấm phát âm"""
-    ai_input_textarea.insert(tk.END, "\n🤖 Sending audio to AI for evaluation...\n")
-    ai_input_textarea.see(tk.END)
-    root.update_idletasks()
-
-    try:
-        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-        # --- Đọc và encode audio thành base64 ---
-        with open(audio_path, "rb") as f:
-            wav_data = f.read()
-        encoded_string = base64.b64encode(wav_data).decode("utf-8")
-
-        # --- Gửi lên API ---
-        completion = client.chat.completions.create(
-            model="gpt-4o-audio-preview",
-            modalities=["text", "audio"],
-            audio={"voice": "alloy", "format": "wav"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Bạn là giáo viên tiếng Anh, hãy nghe đoạn ghi âm của học viên "
-                               "và chấm điểm phát âm, chỉ ra lỗi, đưa gợi ý cải thiện."
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Xin hãy đánh giá phát âm của tôi trong đoạn ghi âm sau."
-                        },
-                        {
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": encoded_string,
-                                "format": "wav"
-                            }
-                        }
-                    ]
-                }
-            ]
-        )
-
-        feedback = completion.choices[0].message["content"][0]["text"]
-        ai_input_textarea.insert(tk.END, f"\n🎧 AI Feedback:\n{feedback}\n")
-        ai_input_textarea.see(tk.END)
-
-    except Exception as e:
-        ai_input_textarea.insert(tk.END, f"\n❌ Error sending audio: {e}\n")
-        ai_input_textarea.see(tk.END)
-
-
-
-ai_btn_input_frame = tk.Frame(ai_input_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
-ai_btn_input_frame.grid(row=0, column=1, sticky="ew", padx=5, pady=(8,0))
-ai_btn_input_frame.grid_rowconfigure(0, weight=0)
-ai_btn_input_frame.grid_rowconfigure(1, weight=0)
+# UI buttons on right
+ai_btn_input_frame = tk.Frame(right_frame, bg=CARD_BG)
+ai_btn_input_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=(8,0))
 ai_btn_input_frame.grid_columnconfigure(0, weight=1)
+ai_btn_input_frame.grid_columnconfigure(1, weight=1)
+ai_btn_input_frame.grid_rowconfigure(0, weight=1)
 
-record_button_answer = tk.Button(ai_btn_input_frame, text="Record Answer", font=livvic_font, bg=BTN_GREEN, fg="white", relief="flat", width=14, command=lambda: record_ai_and_send_text(record_button_answer))
-record_button_answer.grid(row=1, column=0, padx=(6,12), pady=12, sticky="ew")
+record_button_answer = tk.Button(ai_btn_input_frame, text="🎙️ Record Answer", font=livvic_font, bg=BTN_GREEN, fg="white", relief="flat",
+                                 width=14, command=lambda: record_ai_and_send_text(record_button_answer))
+record_button_answer.grid(row=0, column=0, padx=(6,12), pady=12, sticky="ew")
 
-send_btn = tk.Button(ai_btn_input_frame, text="Send to AI", font=livvic_font, bg=ACCENT, fg="white", relief="flat", width=12, command=send_to_ai_from_input)
-send_btn.grid(row=0, column=0, padx=6, pady=12, sticky="ew")
+send_btn = tk.Button(ai_btn_input_frame, text="💬 Send to AI", font=livvic_font, bg=ACCENT, fg="white", relief="flat",
+                     width=12, command=send_to_ai_from_input)
+send_btn.grid(row=0, column=1, padx=6, pady=12, sticky="ew")
 
 append_ai_message_to_chat("Xin chào! Tôi là trợ lý học tiếng Anh. Hãy hỏi tôi bất cứ điều gì.")
 
