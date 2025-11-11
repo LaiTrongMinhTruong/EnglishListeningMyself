@@ -71,6 +71,21 @@ Chạy lệnh trong Terminal:
     python main.py
 ```
 
+### Nén main.exe
+- Sau khi chạy thử dự án thành công, bạn có thể nén dự án thành file main.exe để thuận tiện chạy cho những lần sau
+- Chạy lệnh trong Terminal:
+```bash
+  pip install pyinstaller
+
+  pyinstaller ^
+  --onefile ^
+  --noconsole ^
+  --add-data "Livvic-Regular.ttf;." ^
+  --add-data "vocab.json;." ^
+  main.py
+
+```
+
 ---
 
 ### Mẹo sử dụng hiệu quả

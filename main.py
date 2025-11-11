@@ -9,9 +9,15 @@ from deep_translator import GoogleTranslator
 from openai import OpenAI
 import sounddevice as sd
 import speech_recognition as sr
+import sys
 
+def resource_path(relative_path):
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
-VOCAB_FILE = "vocab.json"
+VOCAB_FILE = resource_path("vocab.json")
+FONT_FILE = resource_path("Livvic-Regular.ttf")
 RECORDINGS_DIR = "recordings"
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
