@@ -153,13 +153,13 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
             stream = sd.InputStream(samplerate=16000, channels=1, dtype='int16', callback=callback)
             stream.start()
             if btn_widget:
-                btn_widget.config(text="⏹ Stop Recording")
-            target_text_widget.insert(tk.END, "\n🎙️ Recording... Speak now.")
+                btn_widget.config(text="Stop Recording")
+            # target_text_widget.insert(tk.END, "\n🎙️ Recording... Speak now.")
         except Exception as e:
             recording = False
             if btn_widget:
                 btn_widget.config(text="Record")
-            target_text_widget.insert(tk.END, f"\n❌ Failed to start recording: {e}")
+            # target_text_widget.insert(tk.END, f"\nFailed to start recording: {e}")
     else:
         # stop
         recording = False
@@ -172,7 +172,7 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
             stream = None
 
         if not recorded_frames:
-            target_text_widget.insert(tk.END, "\n⚠️ No audio recorded.")
+            # target_text_widget.insert(tk.END, "\nNo audio recorded.")
             if btn_widget:
                 btn_widget.config(text="Record")
             return
@@ -187,12 +187,12 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
             target_text_widget.delete(1.0, tk.END)
             target_text_widget.insert(tk.END, text)
         except sr.UnknownValueError:
-            target_text_widget.insert(tk.END, "\n⚠️ Could not understand the audio.")
-        except Exception as e:
-            target_text_widget.insert(tk.END, f"\n❌ Speech recognition error: {e}")
+            target_text_widget.insert(tk.END, "\n")
+        # except Exception as e:
+            # target_text_widget.insert(tk.END, f"\nSpeech recognition error: {e}")
 
         if btn_widget:
-            btn_widget.config(text="🎙️ Record")
+            btn_widget.config(text="Record")
 
 # translation middle buttons
 tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right).pack(pady=6)
@@ -336,10 +336,10 @@ def load_table_from_file():
     refresh_vocab_table()
     messagebox.showinfo("Loaded", f"Loaded from {VOCAB_FILE}")
 
-tk.Button(btns_frame, text="➕ Add", command=add_word_popup, bg=BTN_GREEN, fg="white").grid(row=0, column=0, sticky="ew", padx=6)
-tk.Button(btns_frame, text="🗑 Delete", command=delete_selected_word, bg="#e74c3c", fg="white").grid(row=0, column=1, sticky="ew", padx=6)
-tk.Button(btns_frame, text="💾 Save", command=save_table_to_file, bg=ACCENT, fg="white").grid(row=0, column=2, sticky="ew", padx=6)
-tk.Button(btns_frame, text="🔁 Refresh", command=refresh_vocab_table, bg="#95a5a6", fg="white").grid(row=0, column=3, sticky="ew", padx=6)
+tk.Button(btns_frame, text="Add", command=add_word_popup, bg=BTN_GREEN, fg="white").grid(row=0, column=0, sticky="ew", padx=6)
+tk.Button(btns_frame, text="Delete", command=delete_selected_word, bg="#e74c3c", fg="white").grid(row=0, column=1, sticky="ew", padx=6)
+tk.Button(btns_frame, text="Save", command=save_table_to_file, bg=ACCENT, fg="white").grid(row=0, column=2, sticky="ew", padx=6)
+tk.Button(btns_frame, text="Refresh", command=refresh_vocab_table, bg="#95a5a6", fg="white").grid(row=0, column=3, sticky="ew", padx=6)
 
 def practice_vocab_with_ai():
     # Read vocab.json and call AI to generate practice quiz, show in chat
@@ -362,7 +362,7 @@ def practice_vocab_with_ai():
             if client is None:
                 raise RuntimeError("OpenAI client not configured (OPENAI_API_KEY missing).")
             resp = client.responses.create(
-                model="gpt-4.1-mini",
+                model="gpt-4.1-nano",
                 input=[{"role":"user","content": p}],
                 max_output_tokens=500
             )
@@ -444,7 +444,7 @@ def send_to_ai_from_input():
             if client is None:
                 raise RuntimeError("OpenAI client not configured (OPENAI_API_KEY missing).")
             resp = client.responses.create(
-                model="gpt-4.1-mini",
+                model="gpt-4.1-nano",
                 input=[{"role":"user","content": text}],
                 max_output_tokens=300
             )
@@ -484,8 +484,8 @@ def record_ai_and_save_audio_and_send_for_eval(btn_widget):
         stream = sd.InputStream(samplerate=16000, channels=1, dtype='int16', callback=callback)
         stream.start()
         recording = True
-        btn_widget.config(text="⏹ Stop Recording")
-        ai_input_textarea.insert(tk.END, "\n🎙️ Recording... Speak now.\n")
+        btn_widget.config(text="Stop Recording")
+        ai_input_textarea.insert(tk.END, "\nRecording... Speak now.\n")
     else:
         recording = False
         if stream:
@@ -496,8 +496,8 @@ def record_ai_and_save_audio_and_send_for_eval(btn_widget):
                 pass
             stream = None
         if not recorded_frames:
-            ai_input_textarea.insert(tk.END, "\n⚠️ No audio recorded.\n")
-            btn_widget.config(text="🎙️ Record Answer")
+            ai_input_textarea.insert(tk.END, "\nNo audio recorded.\n")
+            btn_widget.config(text="Record Answer")
             return
         audio_data = np.concatenate(recorded_frames, axis=0)
         with wave.open(filename, "wb") as wf:
@@ -505,7 +505,7 @@ def record_ai_and_save_audio_and_send_for_eval(btn_widget):
             wf.setsampwidth(2)
             wf.setframerate(16000)
             wf.writeframes(audio_data.tobytes())
-        ai_input_textarea.insert(tk.END, f"\n💾 Saved: {filename}\n")
+        ai_input_textarea.insert(tk.END, f"\nSaved: {filename}\n")
         btn_widget.config(text="🎙️ Record Answer")
         # If want to send audio to AI (audio model), implement here (requires quota & audio model)
         # For now I just save and show path.
@@ -517,11 +517,11 @@ ai_btn_input_frame.grid_columnconfigure(0, weight=1)
 ai_btn_input_frame.grid_columnconfigure(1, weight=1)
 ai_btn_input_frame.grid_rowconfigure(0, weight=1)
 
-record_button_answer = tk.Button(ai_btn_input_frame, text="🎙️ Record Answer", font=livvic_font, bg=BTN_GREEN, fg="white", relief="flat",
+record_button_answer = tk.Button(ai_btn_input_frame, text="Record Answer", font=livvic_font, bg=BTN_GREEN, fg="white", relief="flat",
                                  width=14, command=lambda: record_ai_and_send_text(record_button_answer))
 record_button_answer.grid(row=0, column=0, padx=(6,12), pady=12, sticky="ew")
 
-send_btn = tk.Button(ai_btn_input_frame, text="💬 Send to AI", font=livvic_font, bg=ACCENT, fg="white", relief="flat",
+send_btn = tk.Button(ai_btn_input_frame, text="Send to AI", font=livvic_font, bg=ACCENT, fg="white", relief="flat",
                      width=12, command=send_to_ai_from_input)
 send_btn.grid(row=0, column=1, padx=6, pady=12, sticky="ew")
 

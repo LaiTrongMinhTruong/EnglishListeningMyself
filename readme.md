@@ -1,9 +1,9 @@
-# 🎓 English Study Box
+# English Study Box
 ### Ứng dụng học tiếng Anh toàn diện dành cho người Việt
 
 ---
 
-## 📘 Giới thiệu
+## Giới thiệu
 
 **English Study Box** là một ứng dụng học tiếng Anh thông minh, thân thiện và trực quan.  
 Dự án kết hợp sức mạnh của **AI (OpenAI GPT)**, **Speech Recognition**, **Text-to-Speech**, và **dịch thuật tự động** để tạo ra môi trường học tập hiệu quả — giúp người học:
@@ -15,7 +15,7 @@ Dự án kết hợp sức mạnh của **AI (OpenAI GPT)**, **Speech Recognitio
 
 ---
 
-## 👨‍🏫 Đối tượng sử dụng
+## 👨Đối tượng sử dụng
 
 Ứng dụng phù hợp cho:
 - **Sinh viên, học sinh** đang học tiếng Anh ở mọi trình độ.
@@ -24,45 +24,46 @@ Dự án kết hợp sức mạnh của **AI (OpenAI GPT)**, **Speech Recognitio
 
 ---
 
-## 🌟 Tính năng nổi bật
+## Tính năng nổi bật
 
-### 🗣 Translation Box
+### Translation Box
 - Hai ô song song (tiếng Việt ↔ tiếng Anh).
 - Dịch tự động, đọc to văn bản, và ghi âm giọng nói để nhận diện.
 - Giao diện trực quan, dễ thao tác.
 
-### 📚 Vocabulary Box
+### Vocabulary Box
 - Quản lý từ vựng qua bảng:
   - Cột: **Word**, **Meaning**, **Example**
   - Hỗ trợ **chỉnh sửa trực tiếp** bằng double-click hoặc popup thêm mới.
 - Các nút chức năng:
-  - ➕ Add — thêm từ mới
-  - 🗑 Delete — xóa dòng chọn
-  - 💾 Save — lưu dữ liệu vào `vocab.json`
-  - 🔁 Refresh — tải lại từ file
-  - 🧠 Practice — gửi danh sách từ cho AI sinh **bài tập trắc nghiệm**
+  - Add — thêm từ mới
+  - Delete — xóa dòng chọn
+  - Save — lưu dữ liệu vào `vocab.json`
+  - Refresh — tải lại từ file
+  - Practice — gửi danh sách từ cho AI sinh **bài tập trắc nghiệm**
 
-### 🤖 AI Chat Box
+### AI Chat Box
 - Trò chuyện tự nhiên hai chiều với AI giáo viên.
 - AI hiểu ngữ cảnh, hỗ trợ luyện tập, sửa lỗi ngữ pháp, đặt câu, giải thích ngữ pháp, v.v.
 - Có thể **ghi âm giọng nói** hoặc **gửi text**.
 - Khi luyện từ vựng, AI sẽ tạo **quiz và phản hồi ngay trong cửa sổ chat**.
 
-### 🎙 Audio System
+### Audio System
 - Ghi âm tự động lưu tại thư mục `recordings/` với tên dạng: recordings/user_audio_YYYYMMDD_HHMMSS.wav
 - Nhận diện giọng nói tiếng Việt và tiếng Anh bằng Google Speech API.
 - Đọc văn bản bằng TTS (`pyttsx3`).
 
 ---
 
-## ⚙️ Cài đặt & Sử dụng
+## Cài đặt & Sử dụng
 
 - Các bạn muốn dùng dự án vui lòng truy cập https://platform.openai.com/settings/organization/api-keys để tạo api key 
 - Sau đó mở terminal, nhập `setx OPENAI_API_KEY '[key]'`. Sau đó kiểm tra bằng lệnh `echo %OPENAI_API_KEY%` để xem key vừa nhập đúng chưa
+- Nếu không thấy key được cập nhật, bạn có thể tắt và mở lại terminal hoặc trình soạn thảo code như Vs Code
 - Nếu tài khoản của bạn có thể sử dụng model AI trả phí, bạn hoàn toàn có thể sử dụng chức năng AI nghe và sửa lỗi phát âm bằng cách thay hàm `record_ai_and_send_text` bằng hàm `record_ai_and_save_audio_and_send_for_eval` ở dòng 523 trong file `main.py`
 - Tự do cấu hình promt để gửi lên AI thực hiện truy vấn ở các hàm liên quan đến gọi API (dòng 344, 435 trong file `main.py`)
 
-### 1️⃣ Cài đặt thư viện
+### Cài đặt thư viện
 Chạy lệnh trong Terminal:
 ```bash
     pip install -r requirements.txt
@@ -72,18 +73,18 @@ Chạy lệnh trong Terminal:
 
 ---
 
-### 💡 Mẹo sử dụng hiệu quả
+### Mẹo sử dụng hiệu quả
 
-- 🗣 Ghi âm – Dịch – Nghe lại: rèn phát âm và phản xạ.
+- Ghi âm – Dịch – Nghe lại: rèn phát âm và phản xạ.
 
-- 📖 Lưu từ vựng mỗi ngày, dùng nút Practice để ôn.
+- Lưu từ vựng mỗi ngày, dùng nút Practice để ôn.
 
-- 💬 Trò chuyện với AI về các chủ đề hàng ngày.
+- Trò chuyện với AI về các chủ đề hàng ngày.
 
-- 🧠 Nhờ AI tạo quiz hoặc viết đoạn văn sử dụng các từ vựng của bạn.
+- Nhờ AI tạo quiz hoặc viết đoạn văn sử dụng các từ vựng của bạn.
 
 ### Tác giả
 - Lại Trọng Minh Trường - [Github](https://github.com/LaiTrongMinhTruong)
 
-### 📝 Dự án mã nguồn mở, phi thương mại.
+### Dự án mã nguồn mở, phi thương mại.
 ### Tự do chỉnh sửa, cải tiến và sử dụng cho mục đích học tập cá nhân.
