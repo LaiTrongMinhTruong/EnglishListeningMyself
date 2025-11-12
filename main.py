@@ -11,13 +11,18 @@ import sounddevice as sd
 import speech_recognition as sr
 import sys
 
+
 def resource_path(relative_path):
     if hasattr(sys, "_MEIPASS"):
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    return os.path.abspath(relative_path)
 
-VOCAB_FILE = resource_path("vocab.json")
+APP_DIR = os.path.join(os.environ["APPDATA"], "EnglishStudyBox") #thay vì lưu vào vocab.json trong thư mục này, khi nén sẽ bị mất dữ liệu khi chạy, đoạn code này sẽ lưu từ vựng vào appdata để không mất dữ liệu (trường hợp nén vào .exe)
+os.makedirs(APP_DIR, exist_ok=True)
+
 FONT_FILE = resource_path("Livvic-Regular.ttf")
+VOCAB_FILE = os.path.join(APP_DIR, "vocab.json")
+# VOCAB_FILE = "vocab.json" #nếu bạn không có ý định nén thành file exe
 RECORDINGS_DIR = "recordings"
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
