@@ -125,6 +125,13 @@ left_trans_area.grid(row=0, column=0, sticky="nsew", padx=(12,6), pady=12)
 
 mid_btns = tk.Frame(trans_block, bg=CARD_BG)
 mid_btns.grid(row=0, column=1, sticky="ns", padx=6, pady=12)
+#add row configure to mid_btns
+mid_btns.grid_rowconfigure(0, weight=1, uniform="group_mid_btns")
+mid_btns.grid_rowconfigure(1, weight=1, uniform="group_mid_btns")
+mid_btns.grid_rowconfigure(2, weight=1, uniform="group_mid_btns")
+mid_btns.grid_rowconfigure(3, weight=1, uniform="group_mid_btns")
+mid_btns.grid_rowconfigure(4, weight=1, uniform="group_mid_btns")
+mid_btns.grid_rowconfigure(5, weight=1, uniform="group_mid_btns")
 
 right_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10)
 right_trans_area.grid(row=0, column=2, sticky="nsew", padx=(6,12), pady=12)
@@ -151,6 +158,36 @@ def do_read_right():
     read_text(right_trans_area.get(1.0, tk.END).strip())
 
 
+def _first_non_empty_line(text: str) -> str:
+    if not text:
+        return ""
+    for line in text.splitlines():
+        s = line.strip()
+        if s:
+            return s
+    return ""
+
+#add word to vocab func
+def add_translation_to_vocab():
+    vn_full = left_trans_area.get(1.0, tk.END)
+    en_full = right_trans_area.get(1.0, tk.END)
+    vn = _first_non_empty_line(vn_full)
+    en = _first_non_empty_line(en_full)
+    if not vn and not en:
+        messagebox.showinfo("Info", "There is no content to add. Please enter Vietnamese and English text.")
+        return
+    if not vn:
+        messagebox.showinfo("Info", "Cannot find Vietnamese text in the left area.")
+        return
+    if not en:
+        messagebox.showinfo("Info", "Cannot find English translation in the right area.")
+        return
+    # Insert VN as 'word' and EN as 'meaning' (keeps the pair together)
+    tree.insert("", "end", values=(vn, en, ""))
+    # save immediately
+    save_table_to_file()
+
+
 def toggle_record_for_area(language, target_text_widget, btn_widget=None):
     global recording, recorded_frames, stream
     lang_code = "vi-VN" if language == "vi" else "en-US"
@@ -169,7 +206,7 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
         except Exception as e:
             recording = False
             if btn_widget:
-                btn_widget.config(text="Record")
+                btn_widget.config(text="Record" + (" VN" if language=="vi" else " EN"))
             # target_text_widget.insert(tk.END, f"\nFailed to start recording: {e}")
     else:
         # stop
@@ -206,16 +243,27 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
             btn_widget.config(text="Record")
 
 # translation middle buttons
-tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right).pack(pady=6)
-tk.Button(mid_btns, text="VN ← EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_right_to_left).pack(pady=6)
-tk.Button(mid_btns, text="Read EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_read_right).pack(pady=6)
+trans_vn_btn = tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right)
+trans_vn_btn.grid(row=0, column=0, sticky="nsew", padx=6, pady=2)
+
+trans_en_btn =tk.Button(mid_btns, text="VN ← EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_right_to_left)
+trans_en_btn.grid(row=1, column=0, sticky="nsew", padx=6, pady=2)
+
+read_en = tk.Button(mid_btns, text="Read EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_read_right)
+read_en.grid(row=2, column=0, sticky="nsew", padx=6, pady=2)
 # record buttons for VN / EN
 rec_vn_btn = tk.Button(mid_btns, text="Record VN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat",
                        command=lambda: toggle_record_for_area("vi", left_trans_area, rec_vn_btn))
-rec_vn_btn.pack(pady=6)
+# rec_vn_btn.pack(pady=6)
+rec_vn_btn.grid(row=3, column=0, sticky="nsew", padx=6, pady=2)
 rec_en_btn = tk.Button(mid_btns, text="Record EN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat",
                        command=lambda: toggle_record_for_area("en", right_trans_area, rec_en_btn))
-rec_en_btn.pack(pady=6)
+# rec_en_btn.pack(pady=6)
+rec_en_btn.grid(row=4, column=0, sticky="nsew", padx=6, pady=2)
+
+# button to add current VN/EN pair into vocab notes
+add_note_btn = tk.Button(mid_btns, text="Add Vocab", font=livvic_font, bg="#f39c12", fg="white", width=12, relief="flat", command=add_translation_to_vocab)
+add_note_btn.grid(row=5, column=0, sticky="nsew", padx=6, pady=2)
 
 
 vocab_card = tk.Frame(left_frame, bg=CARD_BG, highlightbackground="#dfe6e9", highlightthickness=1)
