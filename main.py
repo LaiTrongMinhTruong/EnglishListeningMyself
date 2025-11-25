@@ -24,7 +24,8 @@ FONT_FILE = resource_path("Livvic-Regular.ttf")
 VOCAB_FILE = os.path.join(APP_DIR, "vocab.json")
 # VOCAB_FILE = "vocab.json" #nếu bạn không có ý định nén thành file exe
 RECORDINGS_DIR = "recordings"
-os.makedirs(RECORDINGS_DIR, exist_ok=True)
+#if you use better model for audio eval, uncomment this line below:
+# os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 
 recording = False
@@ -222,7 +223,7 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
         if not recorded_frames:
             # target_text_widget.insert(tk.END, "\nNo audio recorded.")
             if btn_widget:
-                btn_widget.config(text="Record")
+                btn_widget.config(text="Record" + (" VN" if language=="vi" else " EN"))
             return
 
         audio_data = np.concatenate(recorded_frames, axis=0)
@@ -240,10 +241,10 @@ def toggle_record_for_area(language, target_text_widget, btn_widget=None):
             # target_text_widget.insert(tk.END, f"\nSpeech recognition error: {e}")
 
         if btn_widget:
-            btn_widget.config(text="Record")
+            btn_widget.config(text="Record" + (" VN" if language=="vi" else " EN"))
 
 # translation middle buttons
-trans_vn_btn = tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_left_to_right)
+trans_vn_btn = tk.Button(mid_btns, text="VN → EN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat", command=do_translate_left_to_right)
 trans_vn_btn.grid(row=0, column=0, sticky="nsew", padx=6, pady=2)
 
 trans_en_btn =tk.Button(mid_btns, text="VN ← EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat", command=do_translate_right_to_left)
@@ -256,7 +257,7 @@ rec_vn_btn = tk.Button(mid_btns, text="Record VN", font=livvic_font, bg=BTN_GREE
                        command=lambda: toggle_record_for_area("vi", left_trans_area, rec_vn_btn))
 # rec_vn_btn.pack(pady=6)
 rec_vn_btn.grid(row=3, column=0, sticky="nsew", padx=6, pady=2)
-rec_en_btn = tk.Button(mid_btns, text="Record EN", font=livvic_font, bg=BTN_GREEN, fg="white", width=12, relief="flat",
+rec_en_btn = tk.Button(mid_btns, text="Record EN", font=livvic_font, bg=ACCENT, fg="white", width=12, relief="flat",
                        command=lambda: toggle_record_for_area("en", right_trans_area, rec_en_btn))
 # rec_en_btn.pack(pady=6)
 rec_en_btn.grid(row=4, column=0, sticky="nsew", padx=6, pady=2)
@@ -345,33 +346,62 @@ def refresh_vocab_table():
         tree.column(c, width=200)
 
 def add_word_popup():
-    d = simpledialog.Dialog(root, title="Add new word")
-
     win = tk.Toplevel(root)
     win.title("Add new word")
     win.grab_set()
-    tk.Label(win, text="Word").grid(row=0, column=0, padx=8, pady=6)
-    e_word = tk.Entry(win, width=40)
-    e_word.grid(row=0, column=1, padx=8, pady=6)
-    tk.Label(win, text="Meaning").grid(row=1, column=0, padx=8, pady=6)
-    e_mean = tk.Entry(win, width=40)
-    e_mean.grid(row=1, column=1, padx=8, pady=6)
-    tk.Label(win, text="Example").grid(row=2, column=0, padx=8, pady=6)
-    e_ex = tk.Entry(win, width=40)
-    e_ex.grid(row=2, column=1, padx=8, pady=6)
 
+    #Center Window + Size ------
+    win.update_idletasks()
+    w = 380
+    h = 180
+    x = (win.winfo_screenwidth() - w) // 2
+    y = (win.winfo_screenheight() - h) // 2
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
+    # set grid info
+    win.grid_columnconfigure(0, weight=0)
+    win.grid_columnconfigure(1, weight=1)
+    win.grid_rowconfigure(0, weight=1)
+    win.grid_rowconfigure(1, weight=1)
+    win.grid_rowconfigure(2, weight=1)
+    win.grid_rowconfigure(3, weight=0)
+    
+    # Inputs
+    tk.Label(win, text="Word").grid(row=0, column=0, padx=8, pady=6)
+    e_word = tk.Entry(win, width=40, font=livvic_font)
+    e_word.grid(row=0, column=1, padx=8, pady=6, sticky="nsew")
+
+    tk.Label(win, text="Meaning").grid(row=1, column=0, padx=8, pady=6)
+    e_mean = tk.Entry(win, width=40, font=livvic_font)
+    e_mean.grid(row=1, column=1, padx=8, pady=6, sticky="nsew")
+
+    tk.Label(win, text="Example").grid(row=2, column=0, padx=8, pady=6)
+    e_ex = tk.Entry(win, width=40, font=livvic_font)
+    e_ex.grid(row=2, column=1, padx=8, pady=6, sticky="nsew")
+
+    # OK handler
     def on_ok():
         w = e_word.get().strip()
         m = e_mean.get().strip()
         ex = e_ex.get().strip()
+
         if not w:
             messagebox.showwarning("Validation", "Word cannot be empty.")
             return
+
         tree.insert("", "end", values=(w, m, ex))
         win.destroy()
 
-    tk.Button(win, text="Add", command=on_ok, bg=ACCENT, fg="white").grid(row=3, column=0, columnspan=2, pady=8)
+    # Button
+    tk.Button(win, text="Add", command=on_ok, bg=ACCENT, fg="white")\
+        .grid(row=3, column=0, columnspan=2, pady=8)
+
+    # Auto focus + Enter = Add
+    e_word.focus_set()
+    win.bind("<Return>", lambda event: on_ok())
+
     win.wait_window()
+
 
 def delete_selected_word():
     sel = tree.selection()
@@ -402,19 +432,20 @@ tk.Button(btns_frame, text="Refresh", command=refresh_vocab_table, bg="#95a5a6",
 
 def practice_vocab_with_ai():
     # Read vocab.json and call AI to generate practice quiz, show in chat
-    data = load_vocab()
+    data = load_vocab() # retun json.load(f) if ok
     if not data:
         messagebox.showinfo("No vocab", "Vocabulary list is empty. Add words first.")
         return
+    words = [item["word"] for item in data]
+    word_list_str = ", ".join(words)
 
     prompt = (
-        "You are a B2 English teacher. Based on the following vocabulary list, create a short test of 5 sentences.\n"
-        "Each question is a multiple choice question with 4 options, only 1 correct answer. "
-        "Number the questions, and at the end give the correct answer with short explanation.\n\n"
-        f"{json.dumps(data, ensure_ascii=False, indent=2)}"
-    )
+    f"Write a short, natural, coherent, meaningful and logical paragraph, B2 level, "
+    f"containing all of the words below. No explanation, no listing.\n"
+    f"Words: {word_list_str}"
+)
 
-    append_ai_message_to_chat("Creating vocabulary exercises...")
+    append_ai_message_to_chat("Creating vocabulary passage include all words in vocab...")
 
     def worker(p):
         try:
@@ -423,7 +454,7 @@ def practice_vocab_with_ai():
             resp = client.responses.create(
                 model="gpt-4.1-nano",
                 input=[{"role":"user","content": p}],
-                max_output_tokens=500
+                max_output_tokens=1000
             )
             out = resp.output_text if hasattr(resp, "output_text") else None
             if not out:
