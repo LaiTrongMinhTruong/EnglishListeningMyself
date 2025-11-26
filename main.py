@@ -184,7 +184,7 @@ def add_translation_to_vocab():
         messagebox.showinfo("Info", "Cannot find English translation in the right area.")
         return
     # Insert VN as 'word' and EN as 'meaning' (keeps the pair together)
-    tree.insert("", "end", values=(vn, en, ""))
+    tree.insert("", "end", values=(en, vn, ""))
     # save immediately
     save_table_to_file()
 
