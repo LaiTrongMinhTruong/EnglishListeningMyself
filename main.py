@@ -123,6 +123,7 @@ trans_block.grid_rowconfigure(0, weight=1)
 
 left_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10)
 left_trans_area.grid(row=0, column=0, sticky="nsew", padx=(12,6), pady=12)
+left_trans_area.bind("<Return>", lambda e: do_translate_left_to_right())
 
 mid_btns = tk.Frame(trans_block, bg=CARD_BG)
 mid_btns.grid(row=0, column=1, sticky="ns", padx=6, pady=12)
@@ -136,6 +137,7 @@ mid_btns.grid_rowconfigure(5, weight=1, uniform="group_mid_btns")
 
 right_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=livvic_font, bg=TEXT_BG, padx=10, pady=10)
 right_trans_area.grid(row=0, column=2, sticky="nsew", padx=(6,12), pady=12)
+right_trans_area.bind("<Return>", lambda e: do_translate_right_to_left())
 
 def do_translate_left_to_right():
     src = left_trans_area.get(1.0, tk.END).strip()
@@ -281,10 +283,46 @@ tree_frame.grid_rowconfigure(0, weight=1)
 tree_frame.grid_columnconfigure(0, weight=1)
 
 tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
+
+# State to track sort direction for 'word' column
+sort_word_state = {"ascending": True}  # True = A-Z, False = random
+
+def on_word_heading_click():
+    """Click 'word' heading to sort: A-Z -> random -> A-Z -> ..."""
+    import random
+    items = tree.get_children()
+    if not items:
+        return
+    
+    if sort_word_state["ascending"]:
+        # Sort A-Z
+        data = []
+        for item_id in items:
+            vals = tree.item(item_id, "values")
+            data.append((item_id, vals))
+        data.sort(key=lambda x: x[1][0].lower())  # Sort by word column
+        sort_word_state["ascending"] = False
+    else:
+        # Random order
+        data = []
+        for item_id in items:
+            vals = tree.item(item_id, "values")
+            data.append((item_id, vals))
+        random.shuffle(data)
+        sort_word_state["ascending"] = True
+    
+    # Re-insert in new order
+    for idx, (item_id, vals) in enumerate(data):
+        tree.move(item_id, '', idx)
+
 for c in cols:
-    tree.heading(c, text=c.capitalize())
+    if c == "word":
+        tree.heading(c, text="Word", command=on_word_heading_click)
+    else:
+        tree.heading(c, text=c.capitalize())
     tree.column(c, width=200, anchor="w")
 tree.grid(row=0, column=0, sticky="nsew")
+tree.bind("<Delete>", lambda e: delete_selected_word())
 
 scroll_y = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=scroll_y.set)
@@ -520,6 +558,7 @@ ai_input_frame.grid_rowconfigure(0, weight=1)
 
 ai_input_textarea = scrolledtext.ScrolledText(ai_input_frame, wrap=tk.WORD, height=5, font=livvic_font, bg=TEXT_BG, relief="flat", padx=10, pady=10)
 ai_input_textarea.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+ai_input_textarea.bind("<Return>", lambda event: send_to_ai_from_input())
 
 # send to AI
 def send_to_ai_from_input():
