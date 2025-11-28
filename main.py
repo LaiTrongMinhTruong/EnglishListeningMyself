@@ -186,7 +186,14 @@ def add_translation_to_vocab():
         messagebox.showinfo("Info", "Cannot find English translation in the right area.")
         return
     # Insert VN as 'word' and EN as 'meaning' (keeps the pair together)
-    tree.insert("", "end", values=(en, vn, ""))
+    item_id = tree.insert("", "end", values=(en, vn, ""))
+    # If meanings are hidden, cache the meaning and blank displayed value
+    if not meaning_visible:
+        meaning_cache[item_id] = vn
+        vals = list(tree.item(item_id, "values"))
+        if len(vals) > 1:
+            vals[1] = ""
+            tree.item(item_id, values=vals)
     # save immediately
     save_table_to_file()
 
@@ -314,10 +321,53 @@ def on_word_heading_click():
     # Re-insert in new order
     for idx, (item_id, vals) in enumerate(data):
         tree.move(item_id, '', idx)
+tree.grid(row=0, column=0, sticky="nsew")
+tree.bind("<Delete>", lambda e: delete_selected_word())
+
+# State to track visibility of 'meaning' column and cache hidden values
+meaning_visible = True
+meaning_cache = {}  # maps item_id -> original meaning when hidden
+
+def toggle_meaning_column():
+    """Toggle visibility of the 'meaning' column in the treeview.
+
+    Instead of removing the column header, this implementation keeps the
+    column visible but replaces cell text with empty string when hidden.
+    The original meanings are cached in `meaning_cache` so they can be
+    restored when showing the column again. This allows clicking the
+    header to toggle back.
+    """
+    global meaning_visible, meaning_cache
+    items = tree.get_children()
+    if meaning_visible:
+        # Hide meanings by caching and blanking displayed value
+        meaning_cache = {}
+        for item_id in items:
+            vals = list(tree.item(item_id, "values"))
+            # ensure there is a meaning slot
+            if len(vals) > 1:
+                meaning_cache[item_id] = vals[1]
+                vals[1] = ""
+                tree.item(item_id, values=vals)
+        meaning_visible = False
+    else:
+        # Restore meanings from cache
+        for item_id in items:
+            vals = list(tree.item(item_id, "values"))
+            if len(vals) > 1:
+                original = meaning_cache.get(item_id)
+                if original is not None:
+                    vals[1] = original
+                # if no cached original (new item added while hidden), leave as-is
+                tree.item(item_id, values=vals)
+        meaning_cache = {}
+        meaning_visible = True
 
 for c in cols:
     if c == "word":
         tree.heading(c, text="Word", command=on_word_heading_click)
+    elif c == "meaning":
+        tree.heading(c, text="Meaning", command=toggle_meaning_column)
     else:
         tree.heading(c, text=c.capitalize())
     tree.column(c, width=200, anchor="w")
@@ -378,7 +428,14 @@ def refresh_vocab_table():
     tree.delete(*tree.get_children())
     data = load_vocab()
     for entry in data:
-        tree.insert("", "end", values=(entry.get("word",""), entry.get("meaning",""), entry.get("example","")))
+        item_id = tree.insert("", "end", values=(entry.get("word",""), entry.get("meaning",""), entry.get("example","")))
+        # If meanings are currently hidden, cache and blank the displayed meaning
+        if not meaning_visible:
+            meaning_cache[item_id] = entry.get("meaning", "")
+            vals = list(tree.item(item_id, "values"))
+            if len(vals) > 1:
+                vals[1] = ""
+                tree.item(item_id, values=vals)
     # autosize columns a bit
     for c in cols:
         tree.column(c, width=200)
@@ -427,7 +484,14 @@ def add_word_popup():
             messagebox.showwarning("Validation", "Word cannot be empty.")
             return
 
-        tree.insert("", "end", values=(w, m, ex))
+        item_id = tree.insert("", "end", values=(w, m, ex))
+        # if meanings hidden, cache and blank display
+        if not meaning_visible:
+            meaning_cache[item_id] = m
+            vals = list(tree.item(item_id, "values"))
+            if len(vals) > 1:
+                vals[1] = ""
+                tree.item(item_id, values=vals)
         win.destroy()
 
     # Button
@@ -446,12 +510,20 @@ def delete_selected_word():
     if not sel:
         messagebox.showinfo("Select", "Please select a row to delete.")
         return
+    # remove cached meaning if present
+    try:
+        meaning_cache.pop(sel[0], None)
+    except Exception:
+        pass
     tree.delete(sel[0])
 
 def save_table_to_file():
     all_vals = []
     for item in tree.get_children():
         w, m, ex = tree.item(item, "values")
+        # if meanings are hidden, prefer cached original
+        if (not meaning_visible) and (item in meaning_cache):
+            m = meaning_cache.get(item, "")
         all_vals.append({"word": w, "meaning": m, "example": ex})
     ok = save_vocab(all_vals)
     if ok:
