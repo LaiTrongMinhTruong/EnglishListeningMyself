@@ -139,6 +139,17 @@ right_trans_area = scrolledtext.ScrolledText(trans_block, wrap=tk.WORD, font=liv
 right_trans_area.grid(row=0, column=2, sticky="nsew", padx=(6,12), pady=12)
 right_trans_area.bind("<Return>", lambda e: do_translate_right_to_left())
 
+# Ctrl+Enter: add current VN/EN pair to vocab (prevents inserting newline)
+def _on_ctrl_enter_add_vocab(event=None):
+    try:
+        add_translation_to_vocab()
+    except Exception:
+        pass
+    return "break"
+
+left_trans_area.bind("<Control-Return>", _on_ctrl_enter_add_vocab)
+right_trans_area.bind("<Control-Return>", _on_ctrl_enter_add_vocab)
+
 def do_translate_left_to_right():
     src = left_trans_area.get(1.0, tk.END).strip()
     if not src:
@@ -153,6 +164,11 @@ def do_translate_right_to_left():
     if not src:
         right_trans_area.insert(tk.END, "\n⚠️ Nothing to translate.")
         return
+    # Read the English text aloud when Enter is pressed in the English box
+    try:
+        read_text(src)
+    except Exception:
+        pass
     tgt = translate_text("en","vn", src)
     left_trans_area.delete(1.0, tk.END)
     left_trans_area.insert(tk.END, tgt)
@@ -194,8 +210,23 @@ def add_translation_to_vocab():
         if len(vals) > 1:
             vals[1] = ""
             tree.item(item_id, values=vals)
-    # save immediately
-    save_table_to_file()
+    # save immediately but silently (no messagebox)
+    all_vals = []
+    for it in tree.get_children():
+        w, m, ex = tree.item(it, "values")
+        if (not meaning_visible) and (it in meaning_cache):
+            m = meaning_cache.get(it, "")
+        all_vals.append({"word": w, "meaning": m, "example": ex})
+    save_vocab(all_vals)
+
+    # Select all text in the widget that currently has focus (if it's one of our text areas)
+    try:
+        focused = root.focus_get()
+        if focused in (left_trans_area, right_trans_area, ai_input_textarea):
+            focused.tag_add("sel", "1.0", "end")
+            focused.focus_set()
+    except Exception:
+        pass
 
 
 def toggle_record_for_area(language, target_text_widget, btn_widget=None):
@@ -413,6 +444,29 @@ def on_tree_double_click(event):
     editing_entry.bind("<FocusOut>", finish_edit)
 
 tree.bind("<Double-1>", on_tree_double_click)
+
+# When a row in the tree is selected, append its meaning (VN) to the left VN box
+# and its word (EN) to the right EN box.
+def on_tree_select(event):
+    sel = tree.selection()
+    if not sel:
+        return
+    item = sel[0]
+    vals = tree.item(item, "values")
+    if not vals:
+        return
+    word = vals[0] if len(vals) > 0 else ""
+    meaning = vals[1] if len(vals) > 1 else ""
+    # append meaning to left (Vietnamese) and word to right (English)
+    try:
+        left_trans_area.delete(1.0, tk.END)
+        right_trans_area.delete(1.0, tk.END)
+        left_trans_area.insert(tk.END, ("\n" if left_trans_area.get(1.0, tk.END).strip() else "") + meaning)
+        right_trans_area.insert(tk.END, ("\n" if right_trans_area.get(1.0, tk.END).strip() else "") + word)
+    except Exception:
+        pass
+
+tree.bind("<<TreeviewSelect>>", on_tree_select)
 
 # buttons under the table
 btns_frame = tk.Frame(vocab_card, bg=CARD_BG)
