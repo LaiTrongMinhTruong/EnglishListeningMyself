@@ -160,15 +160,16 @@ def do_translate_left_to_right():
     right_trans_area.insert(tk.END, tgt)
 
 def do_translate_right_to_left():
-    src = right_trans_area.get(1.0, tk.END).strip()
-    if not src:
-        right_trans_area.insert(tk.END, "\n⚠️ Nothing to translate.")
-        return
     # Read the English text aloud when Enter is pressed in the English box
     try:
         read_text(src)
     except Exception:
         pass
+    
+    src = right_trans_area.get(1.0, tk.END).strip()
+    if not src:
+        right_trans_area.insert(tk.END, "\n⚠️ Nothing to translate.")
+        return
     tgt = translate_text("en","vn", src)
     left_trans_area.delete(1.0, tk.END)
     left_trans_area.insert(tk.END, tgt)
