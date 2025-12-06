@@ -77,7 +77,7 @@ Chạy lệnh trong Terminal:
 ```bash
   pip install pyinstaller
 
-  pyinstaller --onefile --noconsole --add-data "Livvic-Regular.ttf;." main.py
+  pyinstaller --onefile --noconsole --add-data "Livvic-Regular.ttf;." --icon=icon.ico main.py
 
 ```
 
